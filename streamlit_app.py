@@ -10,7 +10,6 @@ import io
 import json
 import zipfile
 from pathlib import Path
-from desktop_agent.policy import validate as validate_desktop_task
 import os
 import secrets
 import threading
@@ -305,35 +304,26 @@ def run():
                 st.text(i['detail'])
         st.info('Nenhuma página do Facebook conectada. OAuth ainda não implementado.')
     elif page=='Automação do Desktop':
-        st.info('Agente local experimental para Windows e Chrome. Executa tarefas revisadas; não conecta este chat ao computador. A integração específica com Muse ainda não está implementada.')
+        st.info('Extensão Chrome: use a aba onde você já está conectado. Não precisa instalar Python nem abrir outro perfil. Primeira versão supervisionada; comandos específicos do Muse ainda precisam ser testados.')
         archive=io.BytesIO()
-        agent_dir=Path(__file__).parent/'desktop_agent'
+        extension_dir=Path(__file__).parent/'chrome_extension'
         with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as bundle:
-            for source in sorted(agent_dir.iterdir()):
-                if source.is_file() and source.suffix in {'.py','.bat','.txt','.md'}:
-                    bundle.write(source,'ReelsFaceAgente/desktop_agent/'+source.name)
-        st.download_button('Baixar agente para Windows',archive.getvalue(),'ReelsFaceAgente.zip','application/zip')
-        st.write('1. Instale Python 3.12+ e Google Chrome no Windows. 2. Extraia o ZIP e abra desktop_agent/iniciar-windows.bat. 3. Abra a tarefa JSON no agente e escolha a pasta de downloads.')
-        st.caption('Primeiro teste: abrir o site e fazer login manualmente no Chrome separado. Não precisa informar senhas neste aplicativo. Instalação gráfica no Windows ainda não validada.')
-        site=st.text_input('Endereço HTTPS do site que deseja abrir',placeholder='Cole o endereço exato do navegador')
+            for source in sorted(extension_dir.iterdir()):
+                if source.is_file() and source.suffix in {'.json','.js','.html','.md'}:
+                    bundle.write(source,'ReelsFaceExtensao/'+source.name)
+        st.download_button('Baixar extensão do Chrome',archive.getvalue(),'ReelsFaceExtensao.zip','application/zip')
+        st.write('1. Extraia o ZIP. 2. Abra chrome://extensions no Chrome e ative Modo do desenvolvedor. 3. Clique Carregar sem compactação e escolha a pasta ReelsFaceExtensao, que contém manifest.json. 4. Volte à aba do Muse, clique no ícone da extensão e em Usar esta aba.')
+        st.write('Teste simples: no painel da extensão, cole um prompt, clique Escolher campo para preencher e depois clique no campo do Muse. Revise o texto antes de enviar manualmente.')
+        site=st.text_input('Endereço HTTPS da aba que já está aberta',placeholder='Cole o endereço completo do navegador')
         if site:
-            task={'version':1,'name':'Teste de abertura do navegador','allowed_sites':[site],'steps':[{'action':'open','url':site}]}
             try:
-                validate_desktop_task(task)
-                st.download_button('Baixar tarefa de teste',json.dumps(task,ensure_ascii=False,indent=2),'tarefa-desktop.json','application/json')
+                from desktop_agent.policy import origin
+                task={'version':1,'target':'current_tab','origin':origin(site),'steps':[{'action':'check'}]}
+                st.download_button('Baixar tarefa de teste da extensão',json.dumps(task,ensure_ascii=False,indent=2),'teste-aba-atual.json','application/json')
             except ValueError as exc:
                 st.error(str(exc))
-        with st.expander('Tarefa avançada — seletores precisam ser testados no site'):
-            st.write('Ações: open, fill, click, wait, download, upload e publish. Cliques exigem revisão local; publish exige vídeo selecionado e confirmação. Nenhuma postagem é considerada confirmada apenas pelo clique.')
-            raw=st.text_area('Tarefa JSON',height=240)
-            if raw:
-                try:
-                    task=json.loads(raw)
-                    validate_desktop_task(task)
-                    st.download_button('Baixar tarefa revisável',json.dumps(task,ensure_ascii=False,indent=2),'tarefa-avancada.json','application/json')
-                except (ValueError,TypeError,KeyError):
-                    st.error('Tarefa inválida. Confira os sites HTTPS, as etapas e os seletores.')
-        st.caption('O agente executa localmente enquanto o computador estiver ligado. Transferência por arquivo; sem fila remota ou status sincronizado. Use PARAR para solicitar o encerramento.')
+        st.caption('O teste JSON somente verifica a aba atual. Para outras tarefas, os seletores da página precisam ser configurados. Upload manual; downloads usam o controle do site e a pasta do Chrome. Publicação exige revisão e confirmação local.')
+        st.caption('PARAR cancela etapas futuras. Recarregar a página encerra a execução. Sem conexão deste chat ao computador ou produção autônoma. Validação no Muse e no Chrome Windows ainda necessária.')
     elif page=='Histórico':
         st.dataframe(call('history'),hide_index=True,use_container_width=True)
     elif page=='Configurações':

@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "Reels-face — usar esta aba",
+  "version": "0.1.0",
+  "description": "Executa tarefas supervisionadas na aba que você autorizar, mantendo o login existente.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {"default_popup": "popup.html"}
+}
