@@ -13,6 +13,23 @@ class DatabaseConfigurationError(RuntimeError):
     pass
 
 
+def connection_diagnostic(error):
+    """Return fixed text only; never echo a driver message or connection URI."""
+    message = str(error).lower()
+    state = getattr(error, 'sqlstate', None)
+    if state == '28P01' or 'password authentication failed' in message:
+        return 'DB-AUTH: O banco recusou a autenticação. Confira o usuário e a nova senha na conexão; caracteres especiais da senha precisam de codificação URL.'
+    if 'tenant or user not found' in message:
+        return 'DB-PROJECT: Usuário ou projeto não encontrado no pooler. Copie novamente a URI Session pooler do seu projeto Supabase.'
+    if 'certificate' in message or 'ssl' in message:
+        return 'DB-TLS: Falha na verificação TLS. Confira o host Session pooler e o certificado do Supabase; não desative a verificação.'
+    if 'resolve' in message or 'translate host' in message:
+        return 'DB-HOST: O endereço do banco não foi localizado. Confira o host copiado do Supabase.'
+    if 'timeout' in message or 'timed out' in message or 'refused' in message or 'unreachable' in message:
+        return 'DB-NETWORK: O banco não respondeu. Confira se o projeto Supabase está ativo e se está usando o Session pooler na porta 5432.'
+    return 'DB-CONNECTION: Não foi possível conectar ao banco. Confira a URI Session pooler, a senha e o estado do projeto no Supabase.'
+
+
 class Row(dict):
     def __getitem__(self, key):
         return tuple(self.values())[key] if isinstance(key, int) else super().__getitem__(key)
@@ -92,6 +109,14 @@ class Database:
             params.update(connect_timeout=10)
         except Exception:
             raise DatabaseConfigurationError('DATABASE_URL inválida ou TLS inseguro. Use URI PostgreSQL e sslmode=verify-full; nunca exponha a senha.') from None
+        # A single bounded preflight preserves a useful, sanitized cause instead
+        # of hiding it behind pool retries and a generic timeout.
+        from psycopg import connect
+        try:
+            with connect(**params) as probe:
+                probe.execute('SELECT 1')
+        except Exception as error:
+            raise DatabaseConfigurationError(connection_diagnostic(error)) from None
         try:
             def configure(connection):
                 connection.execute('SET search_path TO reels_face')

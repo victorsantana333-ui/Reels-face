@@ -18,6 +18,8 @@ import streamlit as st
 from fastapi import HTTPException, UploadFile
 from pydantic import ValidationError
 
+from app.database import DatabaseConfigurationError
+
 from app.main import (ArchiveInput, BatchInput, Confirmation, ContextInput,
                       PreferenceInput, ProductionSettings, ProjectInput,
                       create_app, initialize, worker)
@@ -310,6 +312,9 @@ def run():
 
 try:
     run()
+except DatabaseConfigurationError as exc:
+    st.error(str(exc))
+    st.caption("Atualize os Secrets, salve e reinicie em Manage app → Reboot app. Não compartilhe senhas.")
 except HTTPException as exc:
     st.error(str(exc.detail))
 except ValidationError as exc:
