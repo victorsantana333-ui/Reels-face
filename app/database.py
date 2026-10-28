@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from pathlib import Path
 import re
 import sqlite3
+import ssl
+import tempfile
 
 
 class DatabaseConfigurationError(RuntimeError):
@@ -88,6 +90,7 @@ class Database:
         self.kind = 'postgresql' if url else 'sqlite'
         self.pool = None
         self.url = url
+        self.ca_bundle = None
 
     def open(self):
         if not self.url:
@@ -105,6 +108,19 @@ class Database:
                 if params.get('sslmode', 'verify-full') != 'verify-full':
                     raise ValueError()
                 params.update(sslmode='verify-full', sslrootcert=params.get('sslrootcert', 'system'))
+            host = params.get('host', '').lower()
+            if (host.endswith('.pooler.supabase.com') or host.endswith('.supabase.co')) and params.get('sslrootcert') == 'system':
+                # Trust the project CA supplied by the owner as well as public
+                # roots used by shared poolers. Hostname verification stays on.
+                trusted = Path(__file__).parent / 'certs' / 'supabase-prod-ca-2021.crt'
+                pem = trusted.read_text()
+                ssl.PEM_cert_to_DER_cert(pem)
+                roots = ssl.get_default_verify_paths().cafile
+                bundle = (Path(roots).read_text() if roots else '') + '\n' + pem
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.crt', delete=False) as out:
+                    self.ca_bundle = Path(out.name)
+                    out.write(bundle)
+                params['sslrootcert'] = str(self.ca_bundle)
             params.pop('options', None)
             params.update(connect_timeout=10)
         except Exception:
@@ -116,6 +132,7 @@ class Database:
             with connect(**params) as probe:
                 probe.execute('SELECT 1')
         except Exception as error:
+            self.close()
             raise DatabaseConfigurationError(connection_diagnostic(error)) from None
         try:
             def configure(connection):
@@ -130,12 +147,13 @@ class Database:
                                        check=ConnectionPool.check_connection)
             self.pool.open(wait=True, timeout=15)
         except Exception:
-            if self.pool:
-                self.pool.close()
-                self.pool = None
+            self.close()
             raise DatabaseConfigurationError('Não foi possível conectar ao banco. Confira a conexão, a senha e o certificado nas configurações seguras da hospedagem.') from None
 
     def close(self):
+        if self.ca_bundle:
+            self.ca_bundle.unlink(missing_ok=True)
+            self.ca_bundle = None
         if self.pool:
             self.pool.close()
             self.pool = None
