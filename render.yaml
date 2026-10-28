@@ -1,0 +1,22 @@
+# Blueprint: one persistent service, one application process.
+# The starter plan and persistent disk are paid. Review pricing before creating.
+services:
+  - type: web
+    name: reels-face
+    runtime: python
+    plan: starter
+    region: virginia
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash scripts/start-production.sh
+    healthCheckPath: /api/health
+    disk:
+      name: reels-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: REELS_DATA_DIR
+        value: /var/data/reels-face
+      - key: REELS_ACCESS_TOKEN
+        generateValue: true
