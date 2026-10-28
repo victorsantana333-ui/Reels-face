@@ -2,3 +2,6 @@ fastapi==0.141.1
 uvicorn==0.52.1
 pydantic==2.13.4
 python-multipart==0.0.32
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
+streamlit==1.66.1

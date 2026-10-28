@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as data:
         sock.bind(('127.0.0.1',0))
         port=sock.getsockname()[1]
     url=f'http://127.0.0.1:{port}'
-    proc=subprocess.Popen([sys.executable,'-m','uvicorn','app.main:app','--host','127.0.0.1','--port',str(port)],cwd=ROOT,env={**os.environ,'REELS_DATA_DIR':data,'REELS_ACCESS_TOKEN':''},stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+    proc=subprocess.Popen([sys.executable,'-m','uvicorn','app.main:app','--host','127.0.0.1','--port',str(port)],cwd=ROOT,env={**os.environ,'REELS_DATA_DIR':data,'REELS_ACCESS_TOKEN':'','DATABASE_URL':''},stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
     try:
         for _ in range(60):
             try:

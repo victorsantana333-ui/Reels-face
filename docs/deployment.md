@@ -1,31 +1,71 @@
-# Colocar o aplicativo online pelo Render
+# Publicação gratuita: Streamlit Community Cloud + Supabase
 
-A configuração `render.yaml` cria um serviço Python com HTTPS gerenciado, disco persistente de 1 GB, health check e chave de acesso gerada no servidor. Não precisa instalar nada no seu computador.
+O caminho principal agora é **Streamlit Community Cloud**, com os dados no **Supabase Free**. Não contrate o Render, adicione cartão ou selecione plano pago para seguir este guia. A sessão não criou serviços nem ativou cobrança.
 
-**O plano Starter e o disco são pagos. Confira os preços exibidos pelo Render antes de confirmar.** Não use disco efêmero para dados importantes: os projetos e contextos ficam em SQLite e precisam sobreviver a reinícios e deploys. Não foram contratados serviços nem efetuadas cobranças por este código.
+A documentação oficial do Community Cloud informa hospedagem gratuita integrada ao GitHub. Ela foi consultada no repositório oficial `streamlit/docs`, em `content/deploy/community-cloud`, em 28/10/2026. A contratação/aceitação dos termos e o login pertencem ao titular; esta sessão não tem acesso à sua conta Streamlit ou às credenciais reais do banco.
 
-## Ativação na sua conta
+## 1. Acessar a hospedagem
 
-1. Acesse https://dashboard.render.com/ e entre usando GitHub.
-2. Autorize o Render a acessar `victorsantana333-ui/Reels-face`.
-3. Escolha **New → Blueprint**, selecione o repositório e a branch `main`. O Render lerá `render.yaml`.
-4. Confira o plano, o disco e o custo. Confirme a criação do serviço somente se estiver de acordo.
-5. Aguarde o build e o estado **Live**. O próprio Render informará o endereço HTTPS do aplicativo.
-6. Na área **Environment** do serviço, consulte a chave gerada `REELS_ACCESS_TOKEN`. Digite-a na tela de acesso do Reels-face. Não a envie por chat, não a coloque no GitHub nem na URL.
+Entre em https://share.streamlit.io/ usando **Continue with GitHub**. Autorize o acesso ao repositório. Se seu repositório for privado, pode ser necessário conceder acesso adicional a ele. A hospedagem pode solicitar confirmação do e-mail.
 
-O login pelo GitHub no Muse AI não conecta uma conta de hospedagem ao Codex. A primeira autorização da conta Render e a contratação do serviço exigem ação do titular. Esta sessão não possui credenciais ou ferramenta de deploy para Render.
+Escolha **Create app / New app → Deploy an app from GitHub** e preencha:
 
-## Conferência após ativar
+| Campo | Valor |
+|---|---|
+| Repository | `victorsantana333-ui/Reels-face` |
+| Branch | `main` |
+| Main file path | `streamlit_app.py` |
+| Python | `3.12` em Advanced settings |
 
-- A página inicial deve solicitar sua chave. APIs de dados sem autenticação devem retornar 401.
-- `/api/health` deve retornar `status: ok`, `worker_enabled: true` e `worker_error: null`.
-- Crie um projeto de teste, reinicie o serviço e confirme que ele continua disponível.
-- O disco é montado em `/var/data`; o banco fica em `/var/data/reels-face/reels.sqlite3`.
-- O banco vazio de produção cria apenas Histórias de Passarinhos. Seus contextos locais não são enviados automaticamente ao GitHub ou Render; importe os arquivos na nova instalação.
-- Mantenha uma única instância e um único worker enquanto usar SQLite e a fila local. Faça backups regulares do banco pela API de backup SQLite.
+O arquivo de entrada é `streamlit_app.py`, **não** `app/main.py`. A nova interface reutiliza as mesmas operações de backend da interface original e já inclui projetos, contexto, preferências, planejamento de lotes, fila, calendário e histórico. A aplicação FastAPI original continua disponível para desenvolvimento ou outra hospedagem.
 
-## Limites da versão publicada
+## 2. Configurar o banco e a chave com segurança
 
-Estar online não habilita geração de mídia, Muse AI, OAuth Meta, publicação de Reels ou agente desktop. Esses recursos ainda não foram implementados. O aplicativo publicado oferece projetos, contexto, preferências, planejamento de lotes, calendário e histórico para uso pessoal. Não é uma plataforma multiusuário.
+No Supabase, troque qualquer senha anteriormente compartilhada. Em **Connect → Direct → Session pooler → URI**, copie a conexão. Ela deve usar a porta `5432`, o usuário do seu projeto e o host exibido pelo Supabase. Preencha a nova senha; caracteres especiais na senha devem ser codificados como parte da URL.
 
-O script de início confia nos cabeçalhos do proxy para reconhecer HTTPS. Use-o somente atrás do proxy da hospedagem. Não execute a mesma configuração numa máquina diretamente exposta à internet.
+Em **Advanced settings → Secrets** do Community Cloud, preencha o formato abaixo com seus dados **somente no painel seguro**, não no chat e não no GitHub:
+
+```toml
+REELS_ACCESS_TOKEN = "UMA_NOVA_CHAVE_LONGA_E_ALEATORIA_PARA_ENTRAR_NO_APP"
+DATABASE_URL = "postgresql://postgres.PROJECT_REF:NEW_PASSWORD_ENCODED@POOLER_HOST:5432/postgres?sslmode=verify-full&sslrootcert=system"
+```
+
+`REELS_ACCESS_TOKEN` é a chave pessoal para entrar no Reels-face, com pelo menos 16 caracteres. **Não é a senha do banco**, não é chave de API do Supabase e não é token do Facebook. `DATABASE_URL` é a URI privada do Postgres, não o endereço público terminado em `.supabase.co` mostrado na página principal.
+
+O driver exige TLS com verificação de certificado e nome do host. Se houver erro de certificado, confira o host e a CA indicada pelo Supabase; não mude para `sslmode=disable` ou `require`. Os arquivos de exemplo não contêm credenciais reais. `.streamlit/secrets.toml` é ignorado pelo Git.
+
+Salve os Secrets e clique em **Deploy**. O serviço fornecerá o endereço terminado em `.streamlit.app`. Nenhum dado do Supabase foi acessado nesta sessão; a conexão real só poderá ser validada após configurar esses Secrets.
+
+## 3. Conferir a instalação
+
+1. Abra o endereço e informe sua chave pessoal. Sem autenticação, nenhum contexto ou projeto é mostrado.
+2. O projeto inicial será Histórias de Passarinhos; importe seu contexto na Central de Inteligência.
+3. Crie um projeto de teste e depois reinicie o app pelo painel. Verifique que o projeto permanece.
+4. Configure um lote para conferir a fila e o calendário. Sem provedores reais, as tarefas serão marcadas como aguardando configuração, com motivo.
+
+O app cria suas tabelas no schema separado `reels_face`, sem usar ou apagar tabelas existentes do schema `public`. Não expõe credenciais ao frontend e não depende de disco pago. A sessão de desenvolvimento usa PostgreSQL descartável para testes; isso não confirma a conexão com sua conta Supabase.
+
+**Os dados antigos do SQLite não são migrados automaticamente.** O banco local permanece intacto. Importe seus contextos no novo banco; migração integral de histórico requer um procedimento específico antes de começar a usar as duas instalações em paralelo.
+
+## Operação e limites
+
+- Você pode usar o app durante sua sessão e preparar uma operação de vários dias. A fila de preparação roda no processo da hospedagem, independente dos cliques de cada etapa.
+- O plano gratuito pode suspender o processo, limitar recursos ou pausar por inatividade; os dados continuam no Supabase. Trabalho não concluído fica pendente até o app voltar.
+- A fila atual **prepara contexto e planejamento**, não gera imagens/vídeos. Muse AI, renderização, validação visual, OAuth e postagem na Meta continuam não implementados. Não há promessa de geração gratuita por provedores externos.
+- Postar no futuro com o app desligado requer agendamento aceito pela Meta ou um scheduler externo, ainda não implementados. Hospedagem gratuita não garante execução nos horários de postagem.
+- Respeite os limites dos planos gratuitos de hospedagem e banco. Não use mecanismos artificiais para contornar a suspensão.
+- Mantenha apenas uma instância ativa do Reels-face por banco enquanto a recuperação de tarefas não possuir leases distribuídos. Se trocar de interface/hospedagem, encerre a anterior.
+- Não são publicados bancos locais, arquivos `.env`, Secrets nem a senha compartilhada no chat.
+
+## Referências oficiais
+
+- https://docs.streamlit.io/deploy/streamlit-community-cloud
+- https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management
+- https://github.com/streamlit/docs/tree/main/content/deploy/community-cloud
+- https://supabase.com/docs/guides/database/connecting-to-postgres
+
+A documentação atual do Hugging Face foi conferida e informa que criar Docker Spaces exige plano pago. Por isso essa alternativa não foi utilizada.
+
+## Render (opcional, não recomendado para este caso)
+
+`render.yaml` foi alterado para `plan: free`, sem disco ou serviço pago, usando `DATABASE_URL`. Ainda assim, o Render pode exigir verificação da conta ou cartão. Como você não quer adicionar cartão, siga o Community Cloud acima. Nada depende de contratação no Render.

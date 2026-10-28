@@ -15,7 +15,7 @@ class AppTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = patch.dict(os.environ, {'REELS_ACCESS_TOKEN': ''})
         self.env.start()
-        self.app = create_app(self.tmp.name, run_worker=False)
+        self.app = create_app(self.tmp.name, run_worker=False, database_url=getattr(self, 'test_database_url', ''))
         self.client = TestClient(self.app)
         self.client.__enter__()
         self.pid = self.client.get('/api/projects').json()[0]['id']
@@ -176,7 +176,7 @@ class AppTests(unittest.TestCase):
 
     def test_persistence_new_app(self):
         self.new_project('Persistido')
-        with TestClient(create_app(self.tmp.name,run_worker=False)) as client:
+        with TestClient(create_app(self.tmp.name,run_worker=False,database_url=getattr(self, 'test_database_url', ''))) as client:
             self.assertEqual(len(client.get('/api/projects').json()),2)
             self.assertEqual(client.get('/api/projects').json()[-1]['name'],'Persistido')
 

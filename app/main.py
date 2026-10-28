@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import secrets
-import sqlite3
 import threading
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone, date, time
@@ -18,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .providers import INTEGRATIONS
+from .database import Database
 
 ROOT = Path(__file__).parent
 MAX_IMPORT = 2 * 1024 * 1024
@@ -33,17 +33,8 @@ def ident():
 
 @contextmanager
 def db(app):
-    con = sqlite3.connect(app.state.db_path, timeout=15)
-    con.row_factory = sqlite3.Row
-    con.execute('PRAGMA foreign_keys=ON')
-    try:
+    with app.state.database.connection() as con:
         yield con
-        con.commit()
-    except Exception:
-        con.rollback()
-        raise
-    finally:
-        con.close()
 
 
 def event(con, action, project_id=None, detail=''):
@@ -51,9 +42,16 @@ def event(con, action, project_id=None, detail=''):
 
 
 def initialize(app):
-    app.state.data_dir.mkdir(parents=True, exist_ok=True)
+    if not hasattr(app.state, 'database'):
+        app.state.database = Database(app.state.db_path, app.state.database_url)
+        app.state.database.open()
     with db(app) as con:
-        con.execute('PRAGMA journal_mode=WAL')
+        if app.state.database.kind == 'postgresql':
+            con.execute('BEGIN IMMEDIATE')
+            con.execute('CREATE SCHEMA IF NOT EXISTS reels_face')
+            con.execute('REVOKE ALL ON SCHEMA reels_face FROM PUBLIC')
+        else:
+            con.execute('PRAGMA journal_mode=WAL')
         con.executescript('''
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL,
@@ -246,15 +244,17 @@ def prepare_one(app):
 def worker(app):
     while not app.state.stop.is_set():
         try:
-            if not prepare_one(app):
-                app.state.stop.wait(0.5)
+            prepared = prepare_one(app)
+            app.state.worker_error = None
+            if not prepared:
+                app.state.stop.wait(5 if app.state.database.kind == 'postgresql' else 0.5)
         except Exception:
             # Never log creative context or credentials. Expose only a safe health signal.
             app.state.worker_error = 'Falha no processamento local. Verifique disponibilidade do banco.'
             app.state.stop.wait(2)
 
 
-def create_app(data_dir=None, run_worker=True):
+def create_app(data_dir=None, run_worker=True, database_url=None):
     @asynccontextmanager
     async def lifespan(app):
         initialize(app)
@@ -267,11 +267,13 @@ def create_app(data_dir=None, run_worker=True):
         yield
         app.state.stop.set()
         if thread:
-            thread.join(timeout=5)
+            thread.join(timeout=20)
+        app.state.database.close()
 
     app = FastAPI(title='Reels-face', version='0.1.0', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.data_dir = Path(data_dir or os.environ.get('REELS_DATA_DIR', ROOT.parent / 'data')).resolve()
     app.state.db_path = app.state.data_dir / 'reels.sqlite3'
+    app.state.database_url = os.environ.get('DATABASE_URL', '') if database_url is None else database_url
     app.state.access_token = os.environ.get('REELS_ACCESS_TOKEN', '')
 
     @app.middleware('http')
@@ -303,7 +305,7 @@ def create_app(data_dir=None, run_worker=True):
     def health():
         with db(app) as con:
             con.execute('SELECT 1')
-        return {'status': 'ok', 'worker_enabled': run_worker, 'worker_error': app.state.worker_error}
+        return {'status': 'ok', 'worker_enabled': run_worker, 'worker_error': app.state.worker_error, 'database': app.state.database.kind}
 
     @app.get('/api/projects')
     def projects():
@@ -581,6 +583,7 @@ def create_app(data_dir=None, run_worker=True):
                     'spent_cents': 0, 'estimated_cost_cents': None, 'external_actions_enabled': False,
                     'worker_error': app.state.worker_error}
 
+    app.state.operations = {r.name: r.endpoint for r in app.routes if hasattr(r, 'endpoint')}
     app.mount('/static', StaticFiles(directory=ROOT / 'static'), name='static')
     return app
 

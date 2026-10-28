@@ -30,3 +30,13 @@ Horários são convertidos de IANA para UTC; horários inexistentes por mudança
 6. Implementar agente desktop separado e explicitamente pareado, com allowlists, autorizações por ação, expiração de sessão, interrupção, limites e auditoria. Não reutilizar esse mecanismo para contornar restrições externas.
 
 Hospedagem permanente, backups, mídia, custos reais, autenticação multiusuário, observabilidade e publicação precisam de validação específica antes de operação automática em produção.
+
+## Evolução: PostgreSQL e hospedagem gratuita
+
+`app/database.py` agora fornece SQLite para desenvolvimento local e PostgreSQL/Supabase quando `DATABASE_URL` está configurada. O schema `reels_face` é separado do `public`, com acesso público revogado. As consultas continuam parametrizadas; a camada adapta somente o SQL fixo da aplicação e explicita colunas de inserção. O PostgreSQL usa sequência para ordenar registros, pool de até quatro conexões, transações e advisory lock nas transições da fila. A conexão remota exige TLS `verify-full` com raízes do sistema ou CA explicitamente configurada. SQLite permanece inalterado e não é migrado implicitamente.
+
+`streamlit_app.py` adiciona uma interface para Community Cloud. Usa as operações de domínio já registradas pela aplicação FastAPI, sem abrir servidor HTTP interno ou usar cliente de testes em produção. A autenticação por chave pessoal é feita antes de construir a conexão e consultar dados. Cada sessão guarda a autenticação, enquanto o pool e o consumidor são compartilhados no processo por cache de recurso. Uma configuração alterada gera outro fingerprint; não há credencial na chave pública do cache.
+
+Na nuvem, ausência de DATABASE_URL bloqueia o workspace em vez de criar silenciosamente um banco efêmero. `REELS_ALLOW_LOCAL_UI=1` é uma opção explícita apenas para desenvolvimento. Os dados de conexão permanecem nos Secrets da hospedagem. O usuário pode iniciar seu trabalho enquanto usa a aplicação, mas suspensão da hospedagem encerra threads; não há garantia de automação 24h, geração real ou postagem agendada.
+
+A API/web original continua funcional. Os mesmos testes de contratos são executados contra ambos os bancos, além de testes da interface Streamlit. A conexão real com Supabase e o deploy no Community Cloud exigem Secrets e autorização da conta; são verificações separadas dos testes locais.
