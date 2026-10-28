@@ -31,7 +31,7 @@ INTEGRATIONS = [
     {"id": "meta", "name": "Facebook / Meta", "status": "not_configured",
      "detail": "OAuth e publicação pendentes. Requer aplicativo Meta, permissões de páginas e tokens no servidor.",
      "capabilities": [], "connected": False},
-    {"id": "desktop", "name": "Agente de desktop", "status": "not_implemented",
-     "detail": "Agente local ainda não implementado. Nenhuma permissão de computador foi concedida.",
+    {"id": "desktop", "name": "Agente de desktop", "status": "not_configured",
+     "detail": "Executor local supervisionado disponível na área Automação do Desktop. Requer instalação no Windows e tarefas JSON; sem conexão remota ou adaptador Muse.",
      "capabilities": [], "connected": False},
 ]

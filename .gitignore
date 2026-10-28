@@ -6,3 +6,4 @@ data/
 .pytest_cache/
 test-results/
 .streamlit/secrets.toml
+.agent-venv/
