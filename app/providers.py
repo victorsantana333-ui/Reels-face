@@ -32,6 +32,6 @@ INTEGRATIONS = [
      "detail": "OAuth e publicação pendentes. Requer aplicativo Meta, permissões de páginas e tokens no servidor.",
      "capabilities": [], "connected": False},
     {"id": "desktop", "name": "Agente de desktop", "status": "not_configured",
-     "detail": "Extensão Chrome supervisionada disponível na área Automação do Desktop. Usa a aba atual após autorização; sem conexão deste chat ou adaptador Muse.",
+     "detail": "Pacote Codex CLI + Playwright disponível para conexão local à aba existente. Instalação Windows e operação no Muse ainda precisam de validação.",
      "capabilities": [], "connected": False},
 ]

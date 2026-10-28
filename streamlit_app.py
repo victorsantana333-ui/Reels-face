@@ -304,26 +304,18 @@ def run():
                 st.text(i['detail'])
         st.info('Nenhuma página do Facebook conectada. OAuth ainda não implementado.')
     elif page=='Automação do Desktop':
-        st.info('Extensão Chrome: use a aba onde você já está conectado. Não precisa instalar Python nem abrir outro perfil. Primeira versão supervisionada; comandos específicos do Muse ainda precisam ser testados.')
+        st.info('Codex local + Chrome: dê ordens em linguagem natural ao agente no seu Windows. A conexão usa a extensão oficial Playwright e a aba onde você já está conectado.')
         archive=io.BytesIO()
-        extension_dir=Path(__file__).parent/'chrome_extension'
+        package_dir=Path(__file__).parent/'windows_codex'
         with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as bundle:
-            for source in sorted(extension_dir.iterdir()):
-                if source.is_file() and source.suffix in {'.json','.js','.html','.md'}:
-                    bundle.write(source,'ReelsFaceExtensao/'+source.name)
-        st.download_button('Baixar extensão do Chrome',archive.getvalue(),'ReelsFaceExtensao.zip','application/zip')
-        st.write('1. Extraia o ZIP. 2. Abra chrome://extensions no Chrome e ative Modo do desenvolvedor. 3. Clique Carregar sem compactação e escolha a pasta ReelsFaceExtensao, que contém manifest.json. 4. Volte à aba do Muse, clique no ícone da extensão e em Usar esta aba.')
-        st.write('Teste simples: no painel da extensão, cole um prompt, clique Escolher campo para preencher e depois clique no campo do Muse. Revise o texto antes de enviar manualmente.')
-        site=st.text_input('Endereço HTTPS da aba que já está aberta',placeholder='Cole o endereço completo do navegador')
-        if site:
-            try:
-                from desktop_agent.policy import origin
-                task={'version':1,'target':'current_tab','origin':origin(site),'steps':[{'action':'check'}]}
-                st.download_button('Baixar tarefa de teste da extensão',json.dumps(task,ensure_ascii=False,indent=2),'teste-aba-atual.json','application/json')
-            except ValueError as exc:
-                st.error(str(exc))
-        st.caption('O teste JSON somente verifica a aba atual. Para outras tarefas, os seletores da página precisam ser configurados. Upload manual; downloads usam o controle do site e a pasta do Chrome. Publicação exige revisão e confirmação local.')
-        st.caption('PARAR cancela etapas futuras. Recarregar a página encerra a execução. Sem conexão deste chat ao computador ou produção autônoma. Validação no Muse e no Chrome Windows ainda necessária.')
+            for name in ('1-configurar.cmd','2-iniciar.cmd','LEIA-ME.md','operacao/AGENTS.md'):
+                bundle.write(package_dir/name,'ReelsFaceCodex/'+name)
+        st.download_button('Baixar conexão Codex para Windows',archive.getvalue(),'ReelsFaceCodex.zip','application/zip')
+        st.write('1. Instale Node.js LTS 22 ou superior. 2. Extraia o pacote. 3. Instale a extensão oficial Playwright no perfil Chrome que usa o Muse. 4. Execute 1-configurar.cmd e depois 2-iniciar.cmd. 5. Entre com ChatGPT e selecione a aba existente quando a extensão solicitar.')
+        st.link_button('Instalar Playwright Extension oficial','https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm')
+        st.caption('O primeiro teste somente observa a aba. Depois dê sua ordem na janela do Codex local. Esta conversa e o aplicativo não ficam conectados remotamente ao Windows.')
+        st.write('Para parar: Ctrl+C na janela do Codex e desconectar pela extensão. Ações já enviadas ao serviço podem continuar. Mantenha computador, Chrome e Codex ativos durante o trabalho.')
+        st.warning('Preparação disponível; execução no Windows e produção completa no Muse ainda não validadas. Seu plano Codex e o Muse têm limites independentes. Não é necessário rodar IA na placa de vídeo.')
     elif page=='Histórico':
         st.dataframe(call('history'),hide_index=True,use_container_width=True)
     elif page=='Configurações':
